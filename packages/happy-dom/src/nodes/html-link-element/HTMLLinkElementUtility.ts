@@ -37,7 +37,7 @@ export default class HTMLLinkElementUtility {
 
 			(<Document>element.ownerDocument)._readyStateManager.startTask();
 
-			const code: string | null = await WindowErrorUtility.captureError<string>(
+			const code: string | null = await WindowErrorUtility.captureErrorAsync<string>(
 				element,
 				async () => await ResourceFetch.fetch(element.ownerDocument, href)
 			);

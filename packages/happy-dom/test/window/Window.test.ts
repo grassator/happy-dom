@@ -309,7 +309,48 @@ describe('Window', () => {
 		});
 	});
 
-	describe('setInnerWidth()', () => {
+	describe('happyDOM.evaluate()', () => {
+		it('Evaluates code and returns the result.', () => {
+			const result = <() => number>window.happyDOM.evaluate('() => 5');
+			expect(result()).toBe(5);
+		});
+
+		it('Respects direct eval.', () => {
+			const result = <string>window.happyDOM.evaluate(`
+			variable = 'globally defined';
+			(function () {
+				var variable = 'locally defined';
+				return eval('variable');
+			})()`);
+
+			expect(result).toBe('locally defined');
+			expect(window['variable']).toBe('globally defined');
+		});
+
+		it('Respects indirect eval.', () => {
+			const result = <string>window.happyDOM.evaluate(`
+			variable = 'globally defined';
+			(function () {
+				var variable = 'locally defined';
+				return (0,eval)('variable');
+			})()`);
+
+			expect(result).toBe('globally defined');
+			expect(window['variable']).toBe('globally defined');
+		});
+
+		it('Catches errors and dispatches an error event.', () => {
+			let errorEvent: ErrorEvent | null = null;
+			window.addEventListener('error', (event) => (errorEvent = <ErrorEvent>event));
+			window.happyDOM.evaluate(`throw new Error('Something went wrong.')`);
+
+			expect((<ErrorEvent>(<unknown>errorEvent)).error).instanceOf(window.Error);
+			expect((<ErrorEvent>(<unknown>errorEvent)).error?.message).toBe('Something went wrong.');
+			expect((<ErrorEvent>(<unknown>errorEvent)).message).toBe('Something went wrong.');
+		});
+	});
+
+	describe('happyDOM.setInnerWidth()', () => {
 		it('Sets window width.', () => {
 			window.happyDOM.setInnerWidth(1920);
 			expect(window.innerWidth).toBe(1920);
@@ -317,7 +358,7 @@ describe('Window', () => {
 		});
 	});
 
-	describe('setInnerHeight()', () => {
+	describe('happyDOM.setInnerHeight()', () => {
 		it('Sets window height.', () => {
 			window.happyDOM.setInnerHeight(1080);
 			expect(window.innerHeight).toBe(1080);
@@ -434,6 +475,30 @@ describe('Window', () => {
 			for (const propertyKey in referenceValues) {
 				expect(window.navigator[propertyKey]).toEqual(referenceValues[propertyKey]);
 			}
+		});
+	});
+
+	describe('eval()', () => {
+		it('Respects direct eval.', () => {
+			const result = window.eval(`
+			variable = 'globally defined';
+			(function () {
+				var variable = 'locally defined';
+				return eval('variable');
+			})()`);
+			expect(result).toBe('locally defined');
+			expect(window['variable']).toBe('globally defined');
+		});
+
+		it('Respects indirect eval.', () => {
+			const result = window.eval(`
+			variable = 'globally defined';
+			(function () {
+				var variable = 'locally defined';
+				return (0,eval)('variable');
+			})()`);
+			expect(result).toBe('globally defined');
+			expect(window['variable']).toBe('globally defined');
 		});
 	});
 
@@ -951,6 +1016,41 @@ describe('Window', () => {
 			expect(response).toBe(expectedResponse);
 			expect((<IRequest>(<unknown>request)).url).toBe(expectedURL);
 			expect((<IRequest>(<unknown>request)).headers.get('test-header')).toBe('test-value');
+		});
+
+		it(`Catches errors thrown after a successful fetch.`, async () => {
+			process.on('unhandledRejection', (reason: Error | Object) => {
+				if (
+					reason instanceof window.Error &&
+					reason.stack?.includes('at main (evalmachine.<anonymous>:')
+				) {
+					window.console.error(reason);
+					window.dispatchEvent(new ErrorEvent('error', { error: reason, message: reason.message }));
+				} else if (process.listenerCount('unhandledRejection') === 1) {
+					process.exit(1);
+				}
+			});
+
+			vi.spyOn(Fetch.prototype, 'send').mockImplementation((): Promise<IResponse> => {
+				return new Promise((resolve) => setTimeout(() => resolve(<IResponse>{}), 2));
+			});
+
+			let errorEvent: ErrorEvent | null = null;
+			window.addEventListener('error', (event) => (errorEvent = <ErrorEvent>event));
+
+			window.happyDOM.evaluate(`
+                debugger;
+                async function main() {
+                    await window.fetch('https://localhost:8080/path/');
+                    throw new Error('Something went wrong.');
+                }
+                main();
+            `);
+
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			expect((<ErrorEvent>(<unknown>errorEvent)).error).toBeInstanceOf(window.Error);
+			expect((<ErrorEvent>(<unknown>errorEvent)).error?.message).toBe('Something went wrong.');
+			expect((<ErrorEvent>(<unknown>errorEvent)).message).toBe('Something went wrong.');
 		});
 	});
 

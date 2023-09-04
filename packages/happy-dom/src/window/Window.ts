@@ -159,9 +159,6 @@ export default class Window extends EventTarget implements IWindow {
 			this.happyDOM.asyncTaskManager.cancelAll();
 		},
 		asyncTaskManager: new AsyncTaskManager(),
-		setURL: (url: string) => {
-			this.location.href = url;
-		},
 		setWindowSize: (options: { width?: number; height?: number }): void => {
 			if (
 				(options.width !== undefined && this.innerWidth !== options.width) ||
@@ -179,6 +176,17 @@ export default class Window extends EventTarget implements IWindow {
 
 				this.dispatchEvent(new Event('resize'));
 			}
+		},
+		setURL: (url: string) => {
+			this.location.href = url;
+		},
+		evaluate: (code: string): unknown => {
+			if (VM.isContext(this)) {
+				return WindowErrorUtility.captureErrorSync<unknown>(this, () =>
+					VM.runInContext(code, this)
+				);
+			}
+			return WindowErrorUtility.captureErrorSync<unknown>(this, () => this.eval(code));
 		},
 		settings: {
 			disableJavaScriptEvaluation: false,
@@ -396,6 +404,7 @@ export default class Window extends EventTarget implements IWindow {
 	public decodeURIComponent: typeof decodeURIComponent;
 	public encodeURI: typeof encodeURI;
 	public encodeURIComponent: typeof encodeURIComponent;
+	public eval: typeof eval;
 	/**
 	 * @deprecated
 	 */
@@ -624,20 +633,6 @@ export default class Window extends EventTarget implements IWindow {
 	}
 
 	/**
-	 * Evaluates code.
-	 *
-	 * @override
-	 * @param code Code.
-	 * @returns Result.
-	 */
-	public eval(code: string): unknown {
-		if (VM.isContext(this)) {
-			return VM.runInContext(code, this);
-		}
-		return eval(code);
-	}
-
-	/**
 	 * Returns an object containing the values of all CSS properties of an element.
 	 *
 	 * @param element Element.
@@ -722,7 +717,7 @@ export default class Window extends EventTarget implements IWindow {
 	public setTimeout(callback: Function, delay = 0, ...args: unknown[]): NodeJS.Timeout {
 		const id = this._setTimeout(async () => {
 			this.happyDOM.asyncTaskManager.endTimer(id);
-			WindowErrorUtility.captureError(this, async () => await callback(...args));
+			WindowErrorUtility.captureErrorAsync(this, async () => await callback(...args));
 		}, delay);
 		this.happyDOM.asyncTaskManager.startTimer(id);
 		return id;
@@ -770,7 +765,10 @@ export default class Window extends EventTarget implements IWindow {
 	 */
 	public requestAnimationFrame(callback: (timestamp: number) => void): NodeJS.Timeout {
 		return this.setTimeout(async () => {
-			WindowErrorUtility.captureError(this, async () => await callback(this.performance.now()));
+			WindowErrorUtility.captureErrorAsync(
+				this,
+				async () => await callback(this.performance.now())
+			);
 		});
 	}
 
@@ -793,7 +791,7 @@ export default class Window extends EventTarget implements IWindow {
 		const taskId = this.happyDOM.asyncTaskManager.startTask(() => (isAborted = true));
 		this._queueMicrotask(async () => {
 			if (!isAborted) {
-				WindowErrorUtility.captureError(this, async () => await callback());
+				WindowErrorUtility.captureErrorAsync(this, async () => await callback());
 				this.happyDOM.asyncTaskManager.endTask(taskId);
 			}
 		});

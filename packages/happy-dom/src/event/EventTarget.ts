@@ -139,7 +139,7 @@ export default abstract class EventTarget implements IEventTarget {
 			const onEventName = 'on' + event.type.toLowerCase();
 
 			if (typeof this[onEventName] === 'function') {
-				WindowErrorUtility.captureError(
+				WindowErrorUtility.captureErrorAsync(
 					window,
 					async () => await this[onEventName].call(this, event)
 				);
@@ -169,7 +169,7 @@ export default abstract class EventTarget implements IEventTarget {
 				if ((<IEventListener>listener).handleEvent) {
 					(<IEventListener>listener).handleEvent(event);
 				} else {
-					WindowErrorUtility.captureError(
+					WindowErrorUtility.captureErrorAsync(
 						window,
 						async () => await (<(event: Event) => void>listener).call(this, event)
 					);
