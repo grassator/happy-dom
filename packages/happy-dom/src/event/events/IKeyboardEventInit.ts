@@ -2,6 +2,7 @@ import IUIEventInit from '../IUIEventInit.js';
 
 export default interface IKeyboardEventInit extends IUIEventInit {
 	key?: string;
+	keyCode?: number;
 	code?: string;
 	location?: number;
 	ctrlKey?: boolean;
