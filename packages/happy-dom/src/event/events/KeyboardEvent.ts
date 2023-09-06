@@ -14,6 +14,7 @@ export default class KeyboardEvent extends UIEvent {
 	public readonly ctrlKey: boolean = false;
 	public readonly isComposing: boolean = false;
 	public readonly key: string = '';
+	public readonly keyCode: number = 0;
 	public readonly location: number = 0;
 	public readonly metaKey: boolean = false;
 	public readonly repeat: boolean = false;
@@ -34,6 +35,7 @@ export default class KeyboardEvent extends UIEvent {
 			this.ctrlKey = eventInit.ctrlKey || false;
 			this.isComposing = eventInit.isComposing || false;
 			this.key = eventInit.key || '';
+			this.keyCode = eventInit.keyCode || 0;
 			this.location = eventInit.location !== undefined ? eventInit.location : 0;
 			this.metaKey = eventInit.metaKey || false;
 			this.repeat = eventInit.repeat || false;
